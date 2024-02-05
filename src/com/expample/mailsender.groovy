@@ -1,7 +1,8 @@
-package com.expample
+// package com.expample
 @Grab('javax.mail:javax.mail-api:1.6.2')
 @Grab('com.sun.mail:javax.mail:1.6.2')
 @Grab('org.codehaus.groovy:groovy-json:3.0.9')
+
 
 import javax.mail.*
 import javax.mail.internet.*
@@ -9,6 +10,7 @@ import groovy.json.JsonSlurper
 
 
 class SendMailer {
+    
     def configFile
     def recipientsFile
     def username
@@ -18,19 +20,22 @@ class SendMailer {
     def from
     def to
     def subject
-    def config
+    def file_path
 
-    SendMailer(String configFile, String recipientsFile){
+    SendMailer(String configFile, String privateToken,String file_path){
         this.configFile = configFile
-        this.recipientsFile = recipientsFile
-        loadConfig()
+        this.file_path = file_path
+
+        loadConfig(privateToken,file_path)
+
        
     }
     @NonCPS
-    private void loadConfig() {
+    private void loadConfig(privateToken,file_path) {
+        getRecipients(privateToken,file_path)
         def slurper = new JsonSlurper()
         def config = slurper.parse(new File(configFile))
-        def recipients = slurper.parse(new File(recipientsFile))
+        def recipients = recipientsFile
         this.username = config.username
         this.password = config.password
         this.host = config.host
@@ -46,9 +51,29 @@ class SendMailer {
     }
 
     def errorMessage(mailMessage){
+        this.subject = "Error build"
         sendMail("Error: $mailMessage")
     }
+    @NonCPS
+    private void getRecipients(privateToken,file_path){
+        def project_id = '101'
+        def branch_name = 'master'
+      
+        def url = new URL('http://git.ru/api/v4/projects/' + project_id + '/repository/files/' + file_path + '/raw?ref=' + branch_name)
 
+        def connection = url.openConnection()
+        connection.setRequestProperty('PRIVATE-TOKEN', privateToken)
+        def responseCode = connection.responseCode
+
+        if (responseCode == 200) {
+            def json_data = new JsonSlurper().parseText(connection.content.text)
+            recipientsFile = json_data
+            // println(recipientsFile)
+        } else {
+            println("Error get  ${responseCode}")
+        }
+
+    }
     private void sendMail(mailMessage){
         try {
             // Создание свойств для подключения к SMTP серверу
